@@ -32,26 +32,6 @@ FEATURES
   
   Clean and modular Python architecture
 
-PROJECT STRUCTURE
-
-  System_Control
-  └── gesture_control
-  ├── actions.py (Keyboard and mouse actions)
-  ├── camera.py (OpenCV camera wrapper)
-  ├── config.py (Global configuration)
-  ├── main.py (Application entry point)
-  ├── mediapipe_hand.py (MediaPipe Hands interface)
-  ├── model_classifier.py (ML model loader and predictor)
-  ├── modes.py (Mouse and ML control loops)
-  ├── utils.py (Image preprocessing helpers)
-  └── assets
-  ├── keras_model.keras (CSL model)
-  ├── keras_model1.keras (ASL model)
-  ├── keras_model2.keras (ISL model)
-  ├── labels.txt
-  ├── labels1.txt
-  └── labels2.txt
-
 REQUIREMENTS
 
   Python version:
