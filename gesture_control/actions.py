@@ -1,6 +1,7 @@
 import pyautogui
 
 pyautogui.FAILSAFE = True  # move mouse to top-left to stop if needed
+pyautogui.PAUSE = 0        # remove default 0.1s delay; debouncing is in modes.py
 
 def move_mouse_to_landmark(landmarks, screen_w, screen_h, lm_index=8):
     # landmark values are normalized [0..1]

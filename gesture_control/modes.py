@@ -14,22 +14,17 @@ def mouse_control_loop(cfg, cam, tracker):
     """
     last_time = time.time() - cfg.gesture_delay_s
 
-    # Lazy import so pyautogui is only loaded when needed
     import pyautogui
     screen_w, screen_h = pyautogui.size()
 
     def count_fingers_rule(lm):
-        """
-        Your existing rule-style mapping.
-        IMPORTANT: You can refine these later; I kept your logic as-is.
-        """
         c = 0
 
         # Move mouse when index finger is "up"
         if lm.landmark[6].y > lm.landmark[8].y:
             move_mouse_to_landmark(lm.landmark, screen_w, screen_h, lm_index=8)
 
-        # clicks + arrows (your rules)
+        # clicks + arrows
         if lm.landmark[8].x > lm.landmark[4].x and lm.landmark[18].y > lm.landmark[20].y:
             c = 2
         if lm.landmark[8].x > lm.landmark[4].x and lm.landmark[18].y > lm.landmark[20].y and lm.landmark[14].y > lm.landmark[16].y:
@@ -119,20 +114,18 @@ def tm_classifier_loop(
     cam,
     tracker,
     classifier,
-    label_to_action,
+    name_to_action: dict,
     window_name: str,
-    return_on_label: int | None = None,  # SHIFT index
-    mouse_on_label: int | None = None,   # BACK TO MOUSE index
-    exit_on_label: int | None = None,    # EXIT index
+    return_on_label: str | None = None,  # label NAME for SHIFT (e.g. "SHF")
+    exit_on_label: str | None = None,    # label NAME for EXIT (e.g. "EXT")
     use_two_hands: bool = False,
-    next_token: str | None = None,       # what to return on SHIFT ("isl"/"csl"/"mouse")
+    next_token: str | None = None,       # token returned when SHIFT detected
 ):
     """
     Returns:
-      - next_token when return_on_label detected (SHIFT)
-      - "mouse" when mouse_on_label detected
+      - next_token when return_on_label (SHIFT) is detected
       - raises SystemExit on exit_on_label or ESC
-      - otherwise continues, runs label_to_action[idx]() when confident
+      - otherwise runs name_to_action[label]() when confident
     """
     last_time = time.time() - cfg.ml_delay_s
 
@@ -145,10 +138,8 @@ def tm_classifier_loop(
         results = tracker.process(view)
         img_h, img_w = view.shape[:2]
 
-        # Show main view always
         cv2.imshow(window_name, view)
 
-        # ESC always exits program
         if cv2.waitKey(1) & 0xFF == 27:
             raise SystemExit
 
@@ -181,10 +172,8 @@ def tm_classifier_loop(
         if crop.size == 0:
             continue
 
-        # ----- Create "white" input image for TM (FIXES your bug) -----
+        # ----- Preprocess for Teachable Machine model -----
         white = make_square_white(crop, cfg.img_size)
-
-        # Optional debug window: what model sees
         cv2.rectangle(view, (x, y), (x + w, y + h), (255, 0, 255), 2)
         cv2.imshow(f"{window_name} - Teachable", white)
 
@@ -192,29 +181,24 @@ def tm_classifier_loop(
         x_in = preprocess_for_tm(white)
         idx, label, conf = classifier.predict(x_in)
 
-        # ----- Debounce & confidence -----
+        # ----- Debounce & confidence gate -----
         now = time.time()
         if conf < cfg.confidence_threshold:
             continue
         if (now - last_time) < cfg.ml_delay_s:
             continue
 
-        # ---- Control gestures ----
-        if return_on_label is not None and idx == return_on_label:
+        # ----- Control gestures (matched by label name, works across all models) -----
+        if return_on_label is not None and label == return_on_label:
             cv2.destroyAllWindows()
             last_time = now
             return next_token or "shift"
 
-        if mouse_on_label is not None and idx == mouse_on_label:
-            cv2.destroyAllWindows()
-            last_time = now
-            return "mouse"
-
-        if exit_on_label is not None and idx == exit_on_label:
+        if exit_on_label is not None and label == exit_on_label:
             raise SystemExit
 
-        # ---- Normal mapped action ----
-        action = label_to_action.get(idx)
+        # ----- Normal mapped action -----
+        action = name_to_action.get(label)
         if action:
             action()
 

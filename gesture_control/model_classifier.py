@@ -6,25 +6,23 @@ from typing import Dict, Tuple
 
 import numpy as np
 
-# MUST be set before importing tensorflow to use legacy tf.keras (Keras 2 via tf-keras)
+# Must be set before importing tensorflow
 os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
-# Optional: quiet TensorFlow logs
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 import tensorflow as tf  # noqa: E402
 
+# Tune CPU threading for Ryzen 7 5800H (8 cores / 16 threads).
+# intra: parallelism within a single op (e.g. matrix multiply)
+# inter: parallelism across independent ops in a graph
+tf.config.threading.set_intra_op_parallelism_threads(8)
+tf.config.threading.set_inter_op_parallelism_threads(4)
+
 
 def _load_model(model_path: Path):
-    """
-    Loads TeachableMachine/TF models saved as .keras or .h5.
-    Your converted .keras files are legacy-tf-keras based, so we force legacy mode above.
-    """
     model_path = Path(model_path)
-
     if not model_path.exists():
         raise FileNotFoundError(f"Model file not found: {model_path}")
-
-    # compile=False avoids optimizer/loss deserialization issues
     return tf.keras.models.load_model(str(model_path), compile=False)
 
 
@@ -47,7 +45,9 @@ class TMClassifier:
         return mapping
 
     def predict(self, x: np.ndarray) -> Tuple[int, str, float]:
-        pred = self.model.predict(x, verbose=0)[0]
+        # Call the model directly (avoids the logging overhead of model.predict()
+        # which is optimised for batched dataset inference, not single samples)
+        pred = self.model(x, training=False).numpy()[0]
         idx = int(np.argmax(pred))
         conf = float(pred[idx])
         label = self.id_to_label.get(idx, f"ID_{idx}")
